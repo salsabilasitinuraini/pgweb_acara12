@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet" />
+
+    <title>Web-GIS with geoserver and leaflet</title>
+
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: 'Times New Roman', Times, serif;
+      }
+      #map {
+        width: 100%;
+        height: 100vh;
+      }
+
+      .legend {
+        background: white;
+        padding: 8px;
+        margin-bottom: 8px !important;
+        border-radius: 4px;
+        border: 1px solid #ccc;
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      }
+      .legend h4 {
+        margin: 0 0 8px 0;
+        padding-bottom: 4px;
+        border-bottom: 1px solid #ccc;
+        font-size: 13px;
+        font-weight: bold;
+        color: #333;
+        font-family: 'Times New Roman', Times, serif;
+      }
+      .legend img {
+        max-width: 100%;
+        height: auto;
+        display: block;
+        transform: scale(0.85);
+        transform-origin: left top;
+      }
+      .legend-container {
+        position: absolute;
+        top: 150px;
+        left: 10px;
+        max-width: 200px;
+        background: white;
+        padding: 8px;
+        border-radius: 4px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        z-index: 1000;
+        max-height: 500px;
+        overflow-y: auto;
+      }
+      .admin-legend {
+        max-height: 150px;
+        overflow-y: auto;
+        margin-bottom: 8px;
+        padding-right: 4px;
+      }
+      .admin-legend::-webkit-scrollbar {
+        width: 6px;
+      }
+      .admin-legend::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 3px;
+      }
+      .admin-legend::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 3px;
+      }
+      .admin-legend::-webkit-scrollbar-thumb:hover {
+        background: #555;
+      }
+      .road-legend {
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg bg-body-tertiary">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="#"><i class="fa-solid fa-globe"></i> Kota Magelang</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+          <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+            <li class="nav-item">
+              <a class="nav-link active" href="https://geoportal.magelangkota.go.id/" target="_blank"><i class="fa-solid fa-layer-group"></i> Sumber Data</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#infoModal"><i class="fa-solid fa-circle-info"></i> Info</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Map -->
+    <div id="map"></div>
+
+    <!-- Modal -->
+    <div class="modal fade" id="infoModal" tabindex="-1" aria-labelledby="infoModal" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h1 class="modal-title fs-5" id="infoModalLabel">Info Pembuat</h1>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <table class="table table-striped table-bordered">
+              <tr>
+                <th>Nama</th>
+                <td>Salsabila Siti Nur Aini</td>
+              </tr>
+              <tr>
+                <th>NIM</th>
+                <td>23/521480/SV/23444</td>
+              </tr>
+              <tr>
+                <th>GitHub</th>
+                <td><a href="http://github.com/salsabilasitinuraini" target="_blank" rel="noopener noreferrer">http://github.com/salsabilasitinuraini </a></td>
+              </tr>
+            </table>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary">Save changes</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="lib/L.Geoserver.js"></script>
+
+    <script>
+      var map = L.map("map").setView([-7.474073158446931, 110.21666498738452], 13);
+
+      var osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      });
+
+      osm.addTo(map);
+
+      var openLayer1 = L.tileLayer.wms("http://localhost:8080/geoserver/pgweb_acara10/wms", {
+        layers: "pgweb_acara10:ADMINISTRASIDESA_AR_25K",
+        transparent: true,
+        format: "image/png",
+        version: "1.1.0",
+        srs: "EPSG:4326",
+      });
+      openLayer1.addTo(map);
+
+      var openLayer2 = L.tileLayer.wms("http://localhost:8080/geoserver/pgweb_acara12/wms", {
+        layers: "pgweb_acara12:521480_jalan_kota_magelang",
+        transparent: true,
+        format: "image/png",
+        version: "1.1.0",
+        srs: "EPSG:4326",
+      });
+      openLayer2.addTo(map);
+
+      // Layer Pendidikan PT 25K baru
+      var openLayer3 = L.tileLayer.wms("http://localhost:8080/geoserver/pgweb_acara12/wms", {
+        layers: "pgweb_acara12:PENDIDIKAN_PT_25K",
+        transparent: true,
+        format: "image/png",
+        version: "1.1.0",
+        srs: "EPSG:4326",
+      });
+      openLayer3.addTo(map);
+
+      var baseMaps = {
+        "OpenStreetMap": osm,
+      };
+
+      var overlayMaps = {
+        "Administrasi Desa AR 25K": openLayer1,
+        "Jalan Kota Magelang": openLayer2,
+        "Pendidikan PT 25K": openLayer3,
+      };
+
+      var layerControl = L.control.layers(baseMaps, overlayMaps).addTo(map);
+
+      var legendContainer = L.DomUtil.create('div', 'legend-container');
+      var legendHTML = ` 
+        <div class="legend">
+          <h4>Legenda Administrasi</h4>
+          <div class="admin-legend">
+            <img src="http://localhost:8080/geoserver/pgweb_acara10/wms?SERVICE=WMS&VERSION=1.1.0&REQUEST=GetLegendGraphic&LAYER=pgweb_acara10%3AADMINISTRASIDESA_AR_25K&FORMAT=image/png&LEGEND_OPTIONS=fontSize:12;fontName:Times New Roman;fontColor:000000;fontAntiAliasing:true" />
+          </div>
+        </div>
+        <div class="legend">
+          <h4>Legenda Jalan</h4>
+          <div class="road-legend">
+            <img src="http://localhost:8080/geoserver/pgweb_acara12/wms?SERVICE=WMS&VERSION=1.1.0&REQUEST=GetLegendGraphic&LAYER=pgweb_acara12%3A521480_jalan_kota_magelang&FORMAT=image/png&LEGEND_OPTIONS=fontSize:12;fontName:Times New Roman;fontColor:000000;fontAntiAliasing:true" />
+          </div>
+        </div>
+        <div class="legend">
+          <h4>Legenda Pendidikan</h4>
+          <div class="road-legend">
+            <img src="http://localhost:8080/geoserver/pgweb_acara12/wms?SERVICE=WMS&VERSION=1.1.0&REQUEST=GetLegendGraphic&LAYER=pgweb_acara12%3APENDIDIKAN_PT_25K&FORMAT=image/png&LEGEND_OPTIONS=fontSize:12;fontName:Times New Roman;fontColor:000000;fontAntiAliasing:true" />
+          </div>
+        </div>
+      `;
+
+      legendContainer.innerHTML = legendHTML;
+      document.body.appendChild(legendContainer);
+    </script>
+  </body>
+</html>
